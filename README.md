@@ -1,0 +1,2 @@
+# SmartSight
+Mini Project
