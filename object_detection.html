@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced Object Detection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f7f7f7;
+      padding-top: 20px;
+    }
+    .container {
+      max-width: 800px;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+    h1, h3 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #outputImage, #liveFeed {
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      margin-top: 20px;
+      max-width: 100%;
+    }
+    .live-stream-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+    }
+    #liveStream {
+      width: 100%;
+      max-width: 600px;
+      height: 400px;
+      object-fit: cover;
+      border: 3px solid #007bff;
+      border-radius: 8px;
+      background-color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mt-4">Object Detection</h1>
+    <hr>
+    <p class="text-center">Select a source for object detection:</p>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="source">Choose Source:</label>
+        <select class="form-control" id="source" name="source" onchange="toggleInputs()">
+          <option value="camera">Local Camera</option>
+          <option value="esp32">ESP32 Camera</option>
+          <option value="upload">Upload File</option>
+        </select>
+      </div>
+      <div class="form-group" id="uploadDiv" style="display:none;">
+        <label for="file">Select file to upload:</label>
+        <input type="file" class="form-control-file" name="file" id="file">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Run Object Detection</button>
+    </form>
+    
+    <div class="mt-4">
+      <h3>Output:</h3>
+      <!-- Live stream display (Centered) -->
+      <div class="live-stream-box">
+        <img id="liveStream" src="{{ url_for('video_feed_object_detection') }}" alt="Live Object Detection Stream">
+      </div>
+    </div>
+
+    <button class="btn btn-danger btn-block mt-3" onclick="confirmStop()">Stop Camera</button>
+    <div id="status" class="status-message mt-2"></div>
+  </div>
+
+  <script>
+    function toggleInputs() {
+      var source = document.getElementById("source").value;
+      var uploadDiv = document.getElementById("uploadDiv");
+      uploadDiv.style.display = (source === "upload") ? "block" : "none";
+    }
+
+    function confirmStop() {
+      if (confirm("Are you sure you want to stop the camera?")) {
+        stopCamera();
+      }
+    }
+
+    function stopCamera() {
+      fetch('/stop_camera')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("status").textContent = data.message;
+          setTimeout(() => {
+            window.location.href = "/home";
+          }, 1500);
+        })
+        .catch(err => {
+          document.getElementById("status").textContent = "Error stopping the camera.";
+        });
+    }
+
+    // Speech Recognition Setup
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (window.SpeechRecognition) {
+      const recognition = new window.SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      function safeExecute(func) {
+        if (typeof func === "function") {
+          func();
+        } else {
+          console.error("Function not defined:", func);
+        }
+      }
+
+      const voiceCommands = {
+        "face detection": () => safeExecute(handleFaceDetection),
+        "face training": () => safeExecute(handleFaceTraining),
+        "object detection": () => safeExecute(handleObjectDetection),
+        "text to speech": () => safeExecute(handleTextToSpeech),
+        "emergency": () => safeExecute(handleEmergencySOS),
+        "sos": () => safeExecute(handleEmergencySOS),
+        "logout": () => safeExecute(handleLogout),
+        "stop camera": () => safeExecute(stopCamera),
+        "home": () => window.location.href = "/home"
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Voice Command Recognized:", transcript);
+        for (const command in voiceCommands) {
+          if (transcript.includes(command)) {
+            console.log("Executing command for:", command);
+            voiceCommands[command]();
+            break;
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognition.onend = () => {
+        // Restart recognition to keep it running in background
+        recognition.start();
+      };
+
+      recognition.start();
+    } else {
+      console.warn("SpeechRecognition API not supported in this browser.");
+    }
+  </script>
+</body>
+</html>

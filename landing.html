@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to SmartSight</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f9;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    h2 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .btn {
+      background-color: #007bff;
+      color: #fff;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+      margin: 10px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <h2>Welcome to SmartSight</h2>
+  <a href="{{ url_for('signin') }}" class="btn">Sign In</a>
+  <a href="{{ url_for('signup') }}" class="btn">Sign Up</a>
+
+  <script>
+    // Check for SpeechRecognition API support
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (window.SpeechRecognition) {
+      const recognition = new window.SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      // Map voice commands for sign in and sign up
+      const voiceCommands = {
+        "sign in": function() { window.location.href = "{{ url_for('signin') }}"; },
+        "sign up": function() { window.location.href = "{{ url_for('signup') }}"; }
+      };
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Voice Command Recognized:", transcript);
+        for (const command in voiceCommands) {
+          if (transcript.includes(command)) {
+            console.log("Executing command for:", command);
+            voiceCommands[command]();
+            break;
+          }
+        }
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognition.onend = function() {
+        // Restart recognition to keep it running in background
+        recognition.start();
+      };
+
+      // Start voice recognition
+      recognition.start();
+    } else {
+      console.warn("SpeechRecognition API not supported in this browser.");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Recognition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Optional Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f4f4f9;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    h1, h3 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      font-weight: 500;
+    }
+    #previewImage, #cameraFeed {
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      margin-top: 20px;
+      max-width: 100%;
+    }
+    .btn {
+      margin-top: 15px;
+    }
+    .text-output {
+      margin-top: 30px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f8f9fa;
+      font-size: 16px;
+      white-space: pre-wrap;
+    }
+  </style>
+  <script>
+    function toggleInput() {
+      var method = document.getElementById('inputMethod').value;
+      var uploadDiv = document.getElementById('uploadDiv');
+      var cameraDiv = document.getElementById('cameraDiv');
+      if (method === 'upload') {
+        uploadDiv.style.display = 'block';
+        cameraDiv.style.display = 'none';
+      } else if (method === 'camera') {
+        uploadDiv.style.display = 'none';
+        cameraDiv.style.display = 'block';
+        // Placeholder: initialize camera feed logic here if available.
+      }
+    }
+    
+    function previewImage(event) {
+      var output = document.getElementById('previewImage');
+      output.src = URL.createObjectURL(event.target.files[0]);
+      output.style.display = 'block';
+      output.onload = function() {
+        URL.revokeObjectURL(output.src);
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Text Recognition</h1>
+    <p class="text-center">Select a method for text recognition:</p>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="inputMethod">Choose Input Method:</label>
+        <select class="form-control" id="inputMethod" name="method" onchange="toggleInput()">
+          <option value="upload">Upload File</option>
+          <option value="camera">Capture with Local Camera</option>
+        </select>
+      </div>
+      <div class="form-group" id="uploadDiv">
+        <label for="imageFile">Select an Image:</label>
+        <input type="file" class="form-control-file" name="imageFile" id="imageFile" onchange="previewImage(event)" required>
+      </div>
+      <div class="form-group" id="cameraDiv" style="display:none;">
+        <label>Camera Preview:</label><br>
+        <img id="cameraFeed" src="" alt="Camera Feed" width="640" height="480">
+        <br>
+        <button type="button" class="btn btn-secondary" onclick="alert('Capture functionality not implemented')">Capture Image</button>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Run Text Recognition</button>
+    </form>
+    <div class="mt-4">
+      <h3>Preview:</h3>
+      <img id="previewImage" src="#" alt="Image Preview" style="display:none;">
+    </div>
+    <div id="recognizedText" class="text-output" style="display:none;">
+      <!-- The recognized text will appear here after processing -->
+    </div>
+  </div>
+  </script>
+  <button class="btn btn-secondary" onclick="window.location.href='/home'">
+    Home
+  </button>  
+  <script>
+    // Check for SpeechRecognition API support
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (window.SpeechRecognition) {
+      const recognition = new window.SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      // Helper: safely execute a function if defined
+      function safeExecute(func) {
+        if (typeof func === "function") {
+          func();
+        } else {
+          console.error("Function not defined:", func);
+        }
+      }
+
+      // Map voice commands to functions with "home" added.
+      const voiceCommands = {
+        "face detection": function() { safeExecute(handleFaceDetection); },
+        "face training": function() { safeExecute(handleFaceTraining); },
+        "object detection": function() { safeExecute(handleObjectDetection); },
+        "text to speech": function() { safeExecute(handleTextToSpeech); },
+        "emergency": function() { safeExecute(handleEmergencySOS); },
+        "sos": function() { safeExecute(handleEmergencySOS); },
+        "logout": function() { safeExecute(handleLogout); },
+        "stop camera": function() { safeExecute(stopCamera); },
+        "home": function() { window.location.href = "/home"; }
+      };
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Voice Command Recognized:", transcript);
+        for (const command in voiceCommands) {
+          if (transcript.includes(command)) {
+            console.log("Executing command for:", command);
+            voiceCommands[command]();
+            break;
+          }
+        }
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognition.onend = function() {
+        // Restart recognition to keep it running in background
+        recognition.start();
+      };
+
+      // Start voice recognition
+      recognition.start();
+    } else {
+      console.warn("SpeechRecognition API not supported in this browser.");
+    }
+  </script>
+</body>
+</html>

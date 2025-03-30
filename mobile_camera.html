@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mobile Camera Capture</title>
+  <style>
+    video {
+      width: 100%;
+      max-width: 600px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Capture Image Using Mobile Camera</h2>
+  <video id="video" autoplay playsinline></video>
+  <br>
+  <button id="captureBtn">Capture Image</button>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <script>
+    // Access the mobile camera
+    const video = document.getElementById('video');
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Error accessing camera: ", err);
+        alert("Error accessing camera.");
+      });
+
+    document.getElementById('captureBtn').addEventListener('click', () => {
+      const canvas = document.getElementById('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Get Base64 image data
+      const imageData = canvas.toDataURL('image/png');
+
+      // Send imageData to Flask backend via fetch (adjust the endpoint as needed)
+      fetch('/save_training', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: "MobileUser",  // You might provide a way to enter the user's name
+          image: imageData,
+          count: 1  // Adjust logic for multiple images as needed
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log("Response:", data);
+        alert(data.message);
+      })
+      .catch(err => {
+        console.error("Error:", err);
+      });
+    });
+  </script>
+</body>
+</html>

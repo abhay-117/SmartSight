@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title if title else "ML Flask App" }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        nav {
+            background: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        nav a {
+            margin-right: 10px;
+            text-decoration: none;
+            color: #333;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .warning {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .flash-messages ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+        }
+        .flash-messages li {
+            background: #e0ffe0;
+            border: 1px solid #b0ffb0;
+            padding: 8px;
+            margin-bottom: 5px;
+        }
+    </style>
+    <script>
+      function updateConnectionStatus() {
+          if (!navigator.onLine) {
+              document.getElementById("connection-status").textContent = "Warning: You are offline!";
+          } else {
+              document.getElementById("connection-status").textContent = "";
+          }
+      }
+      window.addEventListener('online', updateConnectionStatus);
+      window.addEventListener('offline', updateConnectionStatus);
+      window.onload = updateConnectionStatus;
+    </script>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('home') }}">Home</a> |
+        <a href="{{ url_for('activate_esp') }}">Activate ESP</a> |
+        <a href="{{ url_for('login_google') }}">Login with Google</a> |
+        <a href="{{ url_for('face_training') }}">Face Training</a> |
+        <a href="{{ url_for('signin') }}">Sign In</a> |
+        <a href="{{ url_for('signup') }}">Sign Up</a> |
+        <a href="{{ url_for('face_collect') }}">Collect Faces</a> |
+        <a href="{{ url_for('face_train') }}">Train Faces</a> |
+        <a href="{{ url_for('face_recognize') }}">Recognize Faces</a> |
+        <a href="{{ url_for('object_detect') }}">Object Detect</a> |
+        <a href="{{ url_for('text_recognize') }}">Text Recognize</a>
+    </nav>
+    <div id="connection-status" class="warning"></div>
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <ul>
+              {% for msg in messages %}
+                <li>{{ msg }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+    </div>
+    {% block content %}{% endblock %}
+
+    <!-- Voice Navigation Script -->
+    <script>
+      // Check for SpeechRecognition API support
+      window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+      if (window.SpeechRecognition) {
+          const recognition = new window.SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = false;
+          recognition.lang = "en-US";
+
+          // Mapping voice commands to URL paths
+          const voiceCommands = {
+              "home": "{{ url_for('home') }}",
+              "activate esp": "{{ url_for('activate_esp') }}",
+              "login with google": "{{ url_for('login_google') }}",
+              "face training": "{{ url_for('face_training') }}",
+              "sign in": "{{ url_for('signin') }}",
+              "sign up": "{{ url_for('signup') }}",
+              "collect faces": "{{ url_for('face_collect') }}",
+              "train faces": "{{ url_for('face_train') }}",
+              "recognize faces": "{{ url_for('face_recognize') }}",
+              "object detect": "{{ url_for('object_detect') }}",
+              "text recognize": "{{ url_for('text_recognize') }}"
+          };
+
+          recognition.onresult = function(event) {
+              let transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+              console.log("Recognized:", transcript);
+              for (const command in voiceCommands) {
+                  if (transcript.includes(command)) {
+                      console.log("Navigating to:", voiceCommands[command]);
+                      window.location.href = voiceCommands[command];
+                      break;
+                  }
+              }
+          };
+
+          recognition.onerror = function(event) {
+              console.error("Speech recognition error:", event.error);
+          };
+
+          recognition.onend = function() {
+              // Restart recognition to keep listening
+              recognition.start();
+          };
+
+          // Start voice recognition
+          recognition.start();
+      } else {
+          console.warn("SpeechRecognition API not supported in this browser.");
+      }
+    </script>
+</body>
+</html>

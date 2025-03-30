@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Welcome - SmartSight</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f4f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      text-align: center;
+      background-color: #fff;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    .button {
+      background-color: #007bff;
+      border: none;
+      color: #fff;
+      padding: 15px 30px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+    .button:hover {
+      background-color: #0056b3;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to SmartSight</h1>
+    <p>Click the button below to start face detection:</p>
+    <button class="button" onclick="window.location.href='/face-detection'">
+      Face Detection
+    </button>
+  </div>
+  <script>
+    // Check for SpeechRecognition API support
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (window.SpeechRecognition) {
+      const recognition = new window.SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      // Map voice commands to functions
+      const voiceCommands = {
+        "face detection": handleFaceDetection,
+        "face training": handleFaceTraining,
+        "object detection": handleObjectDetection,
+        "text to speech": handleTextToSpeech,
+        "emergency": handleEmergencySOS,
+        "sos": handleEmergencySOS,
+        "logout": handleLogout,
+        "stop camera": stopCamera,
+        "home": function() { window.location.href = "/home"; }
+      };
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Voice Command Recognized:", transcript);
+        for (const command in voiceCommands) {
+          if (transcript.includes(command)) {
+            console.log("Executing command for:", command);
+            voiceCommands[command]();
+            break;
+          }
+        }
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Speech recognition error:", event.error);
+      };
+
+      recognition.onend = function() {
+        // Restart recognition to keep it running in background
+        recognition.start();
+      };
+
+      // Start voice recognition
+      recognition.start();
+    } else {
+      console.warn("SpeechRecognition API not supported in this browser.");
+    }
+  </script>
+</body>
+</html>
