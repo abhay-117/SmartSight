@@ -356,6 +356,7 @@ def generate_object_frames():
     cap.release()
 
 # --- ESP32 Video Frame Generator ---
+import time  # added at the top with the other imports
 def generate_esp32_frames(url):
     while True:
         try:
@@ -369,8 +370,12 @@ def generate_esp32_frames(url):
                         frame_bytes = buffer.tobytes()
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            else:
+                print(f"ESP32 returned status code: {response.status_code}")
+                time.sleep(0.1)
         except Exception as e:
             print(f"Error fetching ESP32 frame: {e}")
+            time.sleep(0.1)
             continue
 
 # --- Flask Routes ---
