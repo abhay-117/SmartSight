@@ -31,6 +31,8 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # More secure secret key
 CORS(app)
 
+
+
 # --- Context Processor for Templates ---
 @app.context_processor
 def inject_user():
@@ -148,6 +150,10 @@ def google_process():
 
 
 # --- Camera and TTS State Management ---
+face_cap = None
+tts_cap = None
+camera_active = False
+camera_lock = threading.Lock()
 camera_active = False
 camera_lock = threading.Lock()
 cap = None
@@ -190,8 +196,7 @@ def text_to_speech_pyttsx3(text):
             return None
 
 # --- Capture Image from Camera ---
-def capture_frame():
-    global cap
+def capture_frame(cap):
     if cap is None or not cap.isOpened():
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
@@ -199,10 +204,9 @@ def capture_frame():
             return None
     ret, frame = cap.read()
     if ret:
-        image_path = os.path.join('static', 'captured_image.png')
-        cv2.imwrite(image_path, frame)
         return frame
     return None
+
 
 # --- Face Detection using YOLOv8 ---
 def detect_faces(image):
@@ -324,7 +328,18 @@ def generate_frames():
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
     cap.release()
-
+def generate_frames_for_text_to_speech():
+    global tts_cap
+    if tts_cap is None or not tts_cap.isOpened():
+        tts_cap = cv2.VideoCapture(0)
+    while True:
+        success, frame = tts_cap.read()
+        if not success:
+            break
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 # --- Live Object Detection Video Frame Generator ---
 def generate_object_frames():
     global cap, camera_active
@@ -430,7 +445,44 @@ def logout():
 
 @app.route('/video_feed')
 @cross_origin()
-def video_feed():
+def video_feed_tts():
+    global camera_active
+    with camera_lock:
+        camera_active = True
+    return Response(generate_frames_for_text_to_speech(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/video_feed_training')
+@cross_origin()
+def video_feed_training():
+    global camera_active_training, cap_training
+    with camera_lock:
+        if not camera_active_training:
+            cap_training = cv2.VideoCapture(0)
+            camera_active_training = True
+
+        while camera_active_training and cap_training.isOpened():
+            success, frame = cap_training.read()
+            if not success:
+                break
+            
+            # Display the frame using OpenCV window
+            cv2.imshow('Training Feed', frame)
+            
+            # Close window if 'q' is pressed
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        # Release the camera and close the window
+        camera_active_training = False
+        cap_training.release()
+        cv2.destroyAllWindows()
+
+    return jsonify({"message": "Training camera stopped."})
+
+
+@app.route('/video_feed_face')
+@cross_origin()
+def video_feed_face():
     global camera_active
     with camera_lock:
         camera_active = True
@@ -457,10 +509,13 @@ def video_feed_esp32():
 def stop_camera():
     global camera_active, cap
     with camera_lock:
-        camera_active = False
-        if cap is not None:
-            cap.release()
+        if camera_active:
+            camera_active = False
+            if cap is not None:
+                cap.release()
+                cap = None  # Reset cap to avoid conflicts
     return jsonify({"message": "Camera stopped"})
+
 
 @app.route('/save_training', methods=['POST'])
 @cross_origin()
@@ -589,43 +644,72 @@ def recognize():
     except Exception as e:
         return jsonify({"status": "error", "message": f"Processing error: {e}"}), 500
 
+camera_lock = threading.Lock()
+face_detection_active = False
+
 @app.route('/text-to-speech', methods=['GET', 'POST'])
 @cross_origin()
 def text_to_speech():
+    global tts_cap, camera_active
     if request.method == 'POST':
-        frame = capture_frame()
         with camera_lock:
-            global camera_active, cap
+            if camera_active:
+                flash("Camera is already in use for another operation.", "danger")
+                return render_template('tts.html')
+
+            camera_active = True
+            frame = capture_frame(tts_cap)
+            if frame is not None:
+                text = extract_text_from_image(frame)
+                if text:
+                    audio_file = text_to_speech_pyttsx3(text)
+                    if audio_file:
+                        audio_url = url_for('static', filename='tts_output.wav')
+                        return render_template('tts.html', audio_url=audio_url, extracted_text=text)
+                else:
+                    flash("No text found in the image.", "danger")
+
+            if tts_cap is not None:
+                tts_cap.release()
+                tts_cap = None
+
             camera_active = False
-            if cap is not None:
-                cap.release()
-        if frame is not None:
-            text = extract_text_from_image(frame)
-            if text:
-                audio_file = text_to_speech_pyttsx3(text)
-                if audio_file:
-                    audio_url = url_for('static', filename='tts_output.wav')
-                    return render_template('tts.html', audio_url=audio_url, extracted_text=text)
-            else:
-                flash("No text found in the image.", "danger")
-        else:
-            flash("Failed to capture image.", "danger")
-        return render_template('tts.html')
+
     return render_template('tts.html')
+
+
 
 @app.route('/face-detection', methods=['GET', 'POST'])
 @cross_origin()
 def face_detection_route():
+    global face_cap, camera_active
     if request.method == 'POST':
-        frame = capture_frame()
-        if frame is not None:
-            processed_frame = detect_faces(frame)
-            output_path = os.path.join('static', 'face_detection.jpg')
-            cv2.imwrite(output_path, processed_frame)
-            return send_file(output_path, mimetype='image/jpeg')
-        else:
-            flash("Failed to capture image.", "danger")
+        with camera_lock:
+            if camera_active:
+                flash("Camera is already in use for another operation.", "danger")
+                return render_template('face_detection.html')
+
+            camera_active = True
+            frame = capture_frame(face_cap)
+            if frame is not None:
+                processed_frame = detect_faces(frame)
+                output_path = os.path.join('static', 'face_detection.jpg')
+                cv2.imwrite(output_path, processed_frame)
+
+                # Release the camera after processing
+                if face_cap is not None:
+                    face_cap.release()
+                    face_cap = None
+
+                camera_active = False
+                return send_file(output_path, mimetype='image/jpeg')
+
+            else:
+                flash("Failed to capture image.", "danger")
+                camera_active = False
+
     return render_template('face_detection.html')
+
 
 @app.route('/face-training', methods=['GET', 'POST'])
 @cross_origin()
